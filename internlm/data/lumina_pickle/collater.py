@@ -23,26 +23,29 @@ def lumina_collate_fn(batch):
     """
     # Initialize lists to store the data from each sample
     tokens, labels, type_ids, indexes = [], [], [], []
-    cumulative_seqlens = [0]
 
     # Calculate the maximum sequence length
     max_length = max(len(sample["tokens"]) for sample in batch)
-    max_length = max(max_length, batch[0]["seq_len"])
+    max_length = min(max_length, batch[0]["seq_len"])
+
+    cumulative_seqlens = [0, max_length]
 
     # Accumulate all samples into respective lists
     for sample in batch:
         tokens.extend(extend_data_to_packed_length(sample["tokens"], max_length, 0.0))
         labels.extend(extend_data_to_packed_length(sample["labels"], max_length, -100.0))
-        type_ids.extend(extend_data_to_packed_length(sample["type_ids"], max_length, 0.0))
+        type_ids.extend(extend_data_to_packed_length([], max_length, 0.0))
         indexes.extend(list(range(max_length)))
         cumulative_seqlens.append(cumulative_seqlens[-1] + max_length)
 
     # Convert lists to tensors
-    xs = torch.tensor(tokens, dtype=torch.long)
-    ys = torch.tensor(labels, dtype=torch.long)
-    ts = torch.tensor(type_ids, dtype=torch.long)
-    indexes = torch.tensor(indexes, dtype=torch.long)
-    cu_seqlens = torch.tensor(cumulative_seqlens[:-1], dtype=torch.int)
+    xs = torch.tensor(tokens, dtype=torch.long).unsqueeze(0)
+    ys = torch.tensor(labels, dtype=torch.long).unsqueeze(0)
+    ts = torch.tensor(type_ids, dtype=torch.long).unsqueeze(0)
+    indexes = torch.tensor(indexes, dtype=torch.long).unsqueeze(0)
+    cu_seqlens = torch.tensor(cumulative_seqlens, dtype=torch.int).unsqueeze(0)
+
+    print(f"hjk cu_seqlens {cu_seqlens}")
 
     # Create the output dictionary
     input_data = {
