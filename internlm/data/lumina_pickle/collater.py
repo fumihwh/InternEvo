@@ -45,8 +45,6 @@ def lumina_collate_fn(batch):
     indexes = torch.tensor(indexes, dtype=torch.long).unsqueeze(0)
     cu_seqlens = torch.tensor(cumulative_seqlens, dtype=torch.int).unsqueeze(0)
 
-    print(f"hjk cu_seqlens {cu_seqlens}")
-
     # Create the output dictionary
     input_data = {
         "input_ids": xs,
