@@ -127,11 +127,9 @@ class LuminaPickleDataset(Dataset):
         assert len(tokens) == len(labels)
 
         return {
-            "tokens": self.extend_data_to_packed_length(tokens, self.seq_len, 0.0),
-            "cu_seqlens": [i * self.seq_len for i in range(2)],
-            "indexes": list(range(self.seq_len)),
-            "labels": self.extend_data_to_packed_length(labels, self.seq_len, -100.0),
-            "type_ids": self.extend_data_to_packed_length([0], self.seq_len, 0.0)
+            "tokens": tokens,
+            "labels": labels,
+            "seq_len": self.seq_len,
         }
 
     def informal_data_format(self, data: list):
@@ -154,7 +152,7 @@ class LuminaPickleDataset(Dataset):
         disallowed_chars = ["/", "\\", ".", "?", "!"]
         for _ in disallowed_chars:
             config_identifier = config_identifier.replace(_, "-")
-        cache_dir = f"./xllmx_data_cache/{config_identifier}"
+        cache_dir = f"/share/xllmx_data_cache/{config_identifier}"
         return cache_dir
 
     def _collect_data_and_save_to_cache(self, cache_dir):
