@@ -944,7 +944,7 @@ class SelfAttention(nn.Module):
         attn_type, op = _select_attn_op(AttnOpType.FixedLenKVPacked)
 
         dropout = self.dropout if attn_type is AttnType.Torch else self.dropout.p
-        extra_args = (key_padding_mask) if attn_type is AttnType.Torch else ()
+        extra_args = (key_padding_mask,) if attn_type is AttnType.Torch else ()
 
         extra_kwargs = {}
         if attn_type is AttnType.SlidingWindowZigZagFlash:
