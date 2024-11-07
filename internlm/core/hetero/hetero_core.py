@@ -19,27 +19,33 @@ from typing import Dict, Tuple, Callable
 import internlm
 from internlm.core.hetero import is_hetero
 
-HETERO_PATCH_DICT: Dict[ModuleType, Tuple[str, Callable]] = dict()
+HETERO_PATCH_DICT: Dict[str, Tuple[ModuleType, str, Callable]] = dict()
 
 
 def register_hetero_patch(fn):
-    global MOD_PATCH_DICT
-    mod, name, call = fn()
-    MOD_PATCH_DICT[mod] = (name, call)
+    global HETERO_PATCH_DICT
+    key, mod, name, call = fn()
+    HETERO_PATCH_DICT[key] = (mod, name, call)
 
 
 @register_hetero_patch
 def patch_hetero_communicate():
     from internlm.core.scheduler.comm.p2p import _communicate
     from internlm.core.hetero.p2p_gloo import _communicate_by_cpu_gloo
-    return internlm.core.scheduler.comm.p2p, _communicate.__name__, _communicate_by_cpu_gloo
+    return ("internlm.core.scheduler.comm.p2p._communicate",
+            internlm.core.scheduler.comm.p2p,
+            _communicate.__name__,
+            _communicate_by_cpu_gloo)
 
 
 @register_hetero_patch
 def patch_hetero_partition_uniform():
     from internlm.core.parallel.shard import partition_uniform
     from internlm.core.hetero.shard_hetero import partition_uniform_hetero
-    return internlm.core.parallel.shard, partition_uniform.__name__, partition_uniform_hetero
+    return ("internlm.core.parallel.shard.partition_uniform",
+            internlm.core.parallel.shard,
+            partition_uniform.__name__,
+            partition_uniform_hetero)
 
 
 def check_backend_in_args(*args, **kwargs):
@@ -78,12 +84,16 @@ def patch_hetero_dist_new_group():
             no_backend, _ = check_backend_in_args(*args, **kwargs)
             if no_backend:
                 kwargs["backend"] = comm_backend_name
+            print(f"{args} {kwargs}")
+
             return fn(*args, **kwargs)
 
         return decorated
 
     from internlm.core.context.process_group_initializer import dist
-    return internlm.core.context.process_group_initializer.dist, dist.new_group.__name__, wrapper_new_group(dist.new_group)
+    return ("internlm.core.context.process_group_initializer.dist.new_group",
+            dist, dist.new_group.__name__,
+            wrapper_new_group(dist.new_group))
 
 
 @register_hetero_patch
@@ -99,21 +109,21 @@ def patch_hetero_dist_init_process_group():
             global_backend = "gloo" if is_hetero else comm_backend_name
             no_backend, hit_idx = check_backend_in_args(*args, **kwargs)
             args_new = list(args)
-            if no_backend:
-                kwargs["backend"] = global_backend
-            elif hit_idx != -1:
+            if hit_idx != -1:
                 args_new[hit_idx] = global_backend
-
+            else:
+                kwargs["backend"] = global_backend
             return fn(*args_new, **kwargs)
 
         return decorated
 
-    from internlm.core.context.process_group_initializer import dist
-    return (internlm.core.context.parallel_context.dist,
+    from internlm.core.context.parallel_context import dist
+    return ("internlm.core.context.parallel_context.dist.init_process_group",
+            dist,
             dist.init_process_group.__name__,
             wrapper_init_process_group(dist.init_process_group))
 
 
 if is_hetero:
-    for k, v in HETERO_PATCH_DICT.items():
-        setattr(k, v[0], v[1])
+    for k, n, v in HETERO_PATCH_DICT.values():
+        setattr(k, n, v)

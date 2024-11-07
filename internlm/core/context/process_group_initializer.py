@@ -9,6 +9,7 @@ from enum import Enum
 
 import torch.distributed as dist
 
+from internlm.core.hetero import is_hetero
 from internlm.utils.timeout import LLM_NCCL_TIMEOUT
 
 
@@ -204,7 +205,7 @@ class Initializer_Pipeline(ProcessGroupInitializer):
         for i in range(self.num_pp_group):
             ranks = [i + j * self.num_pp_group for j in range(self.pipeline_parallel_size)]
             pipe_group_size = len(ranks)
-            pipe_group = dist.new_group(ranks, timeout=LLM_NCCL_TIMEOUT)
+            pipe_group = dist.new_group(ranks, backend="gloo" if is_hetero else None, timeout=LLM_NCCL_TIMEOUT)
             if use_cpu:
                 group_cpu = (
                     dist.new_group(ranks, backend="gloo", timeout=LLM_NCCL_TIMEOUT)
