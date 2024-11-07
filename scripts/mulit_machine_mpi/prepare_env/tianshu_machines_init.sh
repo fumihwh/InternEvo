@@ -24,6 +24,7 @@ cat $HOST_FILE
      --network host \
      --privileged \
      --cap-add=ALL \
+     --ipc=host \
      --pid=host \
      --group-add=video \
      -p 12000-13000:12000-13000 \

@@ -1,6 +1,7 @@
 #! /bin/bash
 
-
+export NCCL_SOCKET_IFNAME=manage0
+export NCCL_IB_HCA=mlx5_0,mlx5_1
 
 BASH_PATH=$(dirname "$0")
 HOST_FILE=$1
