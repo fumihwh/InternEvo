@@ -11,7 +11,7 @@ import torch
 from internlm.accelerator import AcceleratorType, get_accelerator
 from internlm.core.context import Config
 from internlm.core.context import global_context as gpc
-from internlm.core.context.process_group_initializer import ParallelMode, hetero
+from internlm.core.context.process_group_initializer import ParallelMode
 from internlm.utils.common import get_master_node
 from internlm.utils.gputest import warmup_process_group
 from internlm.utils.logger import get_logger
@@ -30,6 +30,10 @@ else:
 
 logger = get_logger(__file__)
 internlm_accelerator = get_accelerator()
+
+from internlm.core.hetero import is_hetero
+if is_hetero:
+    import internlm.core.hetero.hetero_core
 
 
 def get_default_parser():
@@ -714,7 +718,7 @@ def initialize_distributed_env(
         master_port (str): The master port for distributed training. 8888 by default.
         seed (int, optional): Specified random seed for every process. 1024 by default.
     """
-    backend = "gloo" if hetero is True else internlm_accelerator._communication_backend_name
+    backend = internlm_accelerator._communication_backend_name
 
     if launcher == "torch":
         launch_from_torch(config=config, seed=seed, backend=backend)

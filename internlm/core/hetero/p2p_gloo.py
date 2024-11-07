@@ -1,5 +1,16 @@
-#!/usr/bin/env python
-# -*- encoding: utf-8 -*-
+# Copyright 2024 Shanghai Wuwen Xingqiong Intelligent Technology Co., Ltd., Hu Wenhao
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from typing import List, Tuple, Union
 
@@ -10,14 +21,14 @@ from internlm.accelerator import get_accelerator
 from internlm.core.context import ParallelMode
 from internlm.core.context import global_context as gpc
 
-from .utils import gather_split_1d_tensor, split_tensor_into_1d_equal_chunks
+from internlm.core.scheduler.comm.utils import gather_split_1d_tensor, split_tensor_into_1d_equal_chunks
 
 TensorShape = Union[torch.Size, List[int], Tuple[int]]
 internlm_accelerator = get_accelerator()
 
 
-def create_recv_buffer_with_shapes_by_gloo(recv_shapes, dtype, scatter_gather_tensors):
-    from .p2p import _get_tensor_shape
+def create_recv_buffer_with_shapes_by_cpu_gloo(recv_shapes, dtype, scatter_gather_tensors):
+    from internlm.core.scheduler.comm.p2p import _get_tensor_shape
     if isinstance(recv_shapes, torch.Size):
         recv_chunk_shape, recv_split = _get_tensor_shape(recv_shapes, scatter_gather_tensors)
         buffer_recv = torch.empty(recv_chunk_shape, requires_grad=True, device="cpu", dtype=dtype)
@@ -30,8 +41,8 @@ def create_recv_buffer_with_shapes_by_gloo(recv_shapes, dtype, scatter_gather_te
     return buffer_recv, recv_split
 
 
-def process_object_to_send_by_gloo(object_send, scatter_gather_tensors):
-    from .p2p import _get_tensor_shape
+def process_object_to_send_by_cpu_gloo(object_send, scatter_gather_tensors):
+    from internlm.core.scheduler.comm.p2p import _get_tensor_shape
     if isinstance(object_send, torch.Tensor):
         send_split = _get_tensor_shape(object_send.shape, scatter_gather_tensors)[1]
         if send_split:
@@ -50,7 +61,8 @@ def process_object_to_send_by_gloo(object_send, scatter_gather_tensors):
 
     return object_send
 
-def _communicate_by_gloo(
+
+def _communicate_by_cpu_gloo(
         object_send_next: Union[torch.Tensor, List[torch.Tensor]] = None,
         object_send_prev: Union[torch.Tensor, List[torch.Tensor]] = None,
         recv_prev: bool = False,
@@ -76,11 +88,11 @@ def _communicate_by_gloo(
         recv_next (bool): boolean for whether tensor should be received from
                    next rank.
         recv_prev_shape (Union[:class:`torch.Size`, List[:class:`torch.Size`]]): shape of the tensor to be received
-        from the previous stage, defualts to None.
+        from the previous stage, defaults to None.
         recv_next_shape (Union[:class:`torch.Size`, List[:class:`torch.Size`]]): shape of the tensor to be received
-        from the next stage, defualts to None.
-        prev_rank (int): the rank of the previous pipeline stage, defualts to None,
-        next_rank (int): the rank of the next pipeline stage, defualts to None,
+        from the next stage, defaults to None.
+        prev_rank (int): the rank of the previous pipeline stage, defaults to None,
+        next_rank (int): the rank of the next pipeline stage, defaults to None,
         dtype (torch.dtype): data type of intermediate buffers, defaults to None
         scatter_gather_tensors (bool): whether to scatter and gather tensor between pipeline stages, defaults to False
 
@@ -88,7 +100,7 @@ def _communicate_by_gloo(
         Tuple[Union[:class:`torch.Tensor`, List[:class:`torch.Tensor`]]]: returns tensor_recv_prev, tensor_recv_next
     """
 
-    from .p2p import filling_ops_queue
+    from internlm.core.scheduler.comm.p2p import filling_ops_queue
 
     # Create placeholder tensors for receive in forward and backward directions
     # if needed.
@@ -97,13 +109,13 @@ def _communicate_by_gloo(
 
     if recv_prev:
         assert recv_prev_shape is not None
-        tensor_recv_prev, recv_prev_split = create_recv_buffer_with_shapes_by_gloo(
+        tensor_recv_prev, recv_prev_split = create_recv_buffer_with_shapes_by_cpu_gloo(
             recv_prev_shape, dtype, scatter_gather_tensors
         )
 
     if recv_next:
         assert recv_next_shape is not None
-        tensor_recv_next, recv_next_split = create_recv_buffer_with_shapes_by_gloo(
+        tensor_recv_next, recv_next_split = create_recv_buffer_with_shapes_by_cpu_gloo(
             recv_next_shape, dtype, scatter_gather_tensors
         )
 
@@ -116,10 +128,10 @@ def _communicate_by_gloo(
             next_rank = gpc.get_next_global_rank(ParallelMode.PIPELINE)
 
     if object_send_prev is not None:
-        object_send_prev = process_object_to_send_by_gloo(object_send_prev, scatter_gather_tensors)
+        object_send_prev = process_object_to_send_by_cpu_gloo(object_send_prev, scatter_gather_tensors)
 
     if object_send_next is not None:
-        object_send_next = process_object_to_send_by_gloo(object_send_next, scatter_gather_tensors)
+        object_send_next = process_object_to_send_by_cpu_gloo(object_send_next, scatter_gather_tensors)
 
     ops = []
     if object_send_prev is not None:
