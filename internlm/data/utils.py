@@ -29,7 +29,7 @@ def _unpack_data(data, cu_seqlens, padding_v: int = 0):
     bsz = data.shape[0]
 
     num_seq = gpc.config.data["micro_bsz"]
-    seq_len_ = data.shape[1]//num_seq
+    seq_len_ = gpc.config.data.seq_len
     dtype_ = data.dtype
 
     outputs = torch.empty(bsz, num_seq, seq_len_, device=data.device, dtype=dtype_).fill_(padding_v)
